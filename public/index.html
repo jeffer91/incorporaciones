@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#102a43"><meta name="description" content="Encuesta de preferencia de sede de incorporación del ITSQMET."><title>Incorporaciones · ITSQMET</title><link rel="stylesheet" href="styles.css?v=20261113-4"></head>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#102a43"><meta name="description" content="Encuesta de preferencia de sede de incorporación del ITSQMET."><title>Incorporaciones · ITSQMET</title><link rel="stylesheet" href="styles.css?v=20261113-5"></head>
 <body class="student-page">
 <header><a class="brand" href="#encuesta" aria-label="ITSQMET Inicio"><img src="assets/logo-itsqmet.webp" alt="ITSQMET — Formando profesionales de élite"></a></header>
 <main>
@@ -15,7 +15,7 @@
 <div class="results-heading"><h2>Estudiantes</h2><button id="export" class="secondary">Exportar CSV</button></div>
 <div class="filters"><input id="search" aria-label="Buscar estudiante" placeholder="Nombre o cédula"><select id="career" aria-label="Carrera"><option value="">Todas las carreras</option></select><select id="city" aria-label="Sede elegida"><option value="">Todas las sedes</option><option>Quito</option><option>Manta</option></select><select id="status" aria-label="Estado"><option value="">Todos los estados</option><option value="respondio">Respondieron</option><option value="pendiente">Pendientes</option></select></div>
 <p id="resultCount" class="small muted"></p>
-<div class="table-wrap"><table><thead><tr><th>Estudiante</th><th>Carrera</th><th>Preferencia</th><th>Contacto</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>Estudiante</th><th>Carrera</th><th>Preferencia</th><th>Acciones</th><th>Contacto</th></tr></thead><tbody id="rows"></tbody></table></div>
 <div class="pagination"><label for="pageSize">Por página</label><select id="pageSize"><option>25</option><option>50</option><option>100</option></select><span id="pageInfo"></span><button id="prevPage" class="secondary" aria-label="Página anterior">Anterior</button><button id="nextPage" class="secondary" aria-label="Página siguiente">Siguiente</button></div>
 </section>
 <section id="page-comunicaciones" class="admin-section card" hidden>
@@ -29,4 +29,4 @@
 <section id="page-estadisticas" class="admin-section" hidden><h2>Estadísticas</h2><p class="small muted">Resultados de todos los estudiantes habilitados del período seleccionado.</p><div id="metrics" class="metrics"></div><div class="card"><div class="results-heading"><h3>Participación</h3><strong id="participationText"></strong></div><progress id="participation" max="100" value="0" aria-label="Porcentaje de estudiantes que respondieron"></progress><div class="table-wrap"><table><thead><tr><th>Carrera</th><th>Total</th><th>Quito</th><th>Manta</th><th>Pendientes</th><th>Respuesta</th></tr></thead><tbody id="careerStats"></tbody></table></div></div></section>
 <section id="page-configuracion" class="admin-section card" hidden><h2>Configuración de encuesta</h2><p class="small muted">El período se gestiona aquí y no se muestra en la encuesta del estudiante.</p><p id="configStatus" class="small"></p><div class="actions"><button id="sync" class="secondary">Sincronizar estudiantes (opcional)</button><button id="toggle" hidden>Estado interno</button></div><p class="small muted">Cualquier estudiante registrado en Firebase puede elegir sede, aunque no aparezca en el padrón. La sincronización conserva las respuestas existentes.</p><div class="site-links"><a href="index.html" target="_blank" rel="noopener">Abrir encuesta de estudiantes ↗</a></div></section>
 </div></section>
-</main><footer>ITSQMET <span>•</span> Unidad de Titulación y Eficiencia Terminal</footer><script type="module" src="app.js?v=20261113-4"></script></body></html>
+</main><footer>ITSQMET <span>•</span> Unidad de Titulación y Eficiencia Terminal</footer><script type="module" src="app.js?v=20261113-5"></script></body></html>
