@@ -1,7 +1,7 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getFirestore, collection, doc, getDoc, getDocs, setDoc, query, where, writeBatch, serverTimestamp, runTransaction} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
 import {setupAdmin} from './admin-ui.js?v=20261113-4';
-import {validId, recordId, buildRoster, filterRows, csv, chooseEnrollment} from './domain.js';
+import {validId, recordId, buildRoster, filterRows, csv} from './domain.js';
 const firebaseConfig={apiKey:'AIzaSyCaHf1C0BB0X_H3BDZ1o-UDAsPmLTjsZLA',authDomain:'utet-4387a.firebaseapp.com',projectId:'utet-4387a',storageBucket:'utet-4387a.firebasestorage.app',messagingSenderId:'902848131454',appId:'1:902848131454:web:47f515eb6480834724c32f'};
 const db=getFirestore(initializeApp(firebaseConfig));
 const $=id=>document.getElementById(id);
@@ -15,7 +15,7 @@ function explain(error){console.error(error);if(error.code==='permission-denied'
 async function busy(button,fn){const text=button.textContent;button.disabled=true;button.textContent='Procesando…';notice('');try{await fn();}catch(e){notice(explain(e),true);}finally{button.disabled=false;button.textContent=text;}}
 async function list(name){return (await getDocs(collection(db,name))).docs.map(d=>({...d.data(),id:d.id}));}
 async function loadPeriods(){
-  periods=(await list('periodos')).filter(p=>!p.eliminado&&p.activo!==false).sort((a,b)=>b.id.localeCompare(a.id));
+  periods=(await list('periodos')).filter(p=>!p.eliminado).sort((a,b)=>b.id.localeCompare(a.id));
   configs=new Map((await list(configCollection)).map(c=>[c.id,c]));
   $('adminPeriod').innerHTML=periods.map(p=>`<option value="${esc(p.id)}">${esc(p.label||p.id)}</option>`).join('');
   if(adminPeriod&&periods.some(p=>p.id===adminPeriod))$('adminPeriod').value=adminPeriod;
@@ -35,27 +35,38 @@ async function lookupStudent(){
   if(!validId(cedula)){notice('Ingresa una cédula de 10 dígitos.',true);return;}
   $('lookupButton').disabled=true;$('lookupButton').textContent='Buscando…';
   try{
-    // Institutional data is visible independently of survey opening and roster synchronization.
+    // Every non-deleted institutional student may choose a site, without roster or opening prerequisites.
     const profile=await getDoc(doc(db,'Estudiante',cedula));
     if(!current())return;
     if(!profile.exists()||profile.data().eliminado)throw Error('No encontramos tu cédula. Comunícate con Titulación.');
     const data=profile.data();
     $('studentData').innerHTML=`<strong>${esc(data.nombres)}</strong><span>${esc(data.nombreCarreraActual||'')}</span>`;
     $('student').hidden=false;$('answer').hidden=true;$('receipt').hidden=false;
-    $('receipt').textContent='Consultando disponibilidad…';
+    $('receipt').textContent='Preparando elección de sede…';
     await loadPeriods();if(!current())return;
-    const open=periods.filter(p=>configs.get(p.id)?.abierta);
-    const matches=await Promise.all(open.map(async p=>{
-      const id=recordId(p.id,cedula),snapshot=await getDoc(doc(db,rosterCollection,id));
-      return snapshot.exists()?{...snapshot.data(),id}:null;
-    }));
+    if(!periods.length)throw Error('No hay períodos disponibles para registrar tu elección. Comunícate con Titulación.');
+    const [enrollmentDocs,rosters]=await Promise.all([
+      getDocs(query(collection(db,'matriculas'),where('cedula','==',cedula))),
+      Promise.all(periods.map(async p=>{
+        const snapshot=await getDoc(doc(db,rosterCollection,recordId(p.id,cedula)));
+        return snapshot.exists()?{...snapshot.data(),periodoId:p.id}:null;
+      }))
+    ]);
     if(!current())return;
-    const student=chooseEnrollment(matches);
-    if(!student){$('receipt').textContent='Tus datos están registrados. La encuesta aún no está habilitada para ti.';return;}
+    const enrollments=enrollmentDocs.docs.map(d=>d.data());
+    const knownPeriods=new Set([...enrollments.map(m=>m.periodoId),...rosters.filter(Boolean).map(r=>r.periodoId)]);
+    const period=periods.find(p=>knownPeriods.has(p.id))||periods.find(p=>configs.get(p.id)?.abierta)||periods[0];
+    const enrollment=enrollments.find(m=>m.periodoId===period.id);
+    const roster=rosters.find(r=>r?.periodoId===period.id);
+    const student={
+      id:recordId(period.id,cedula),cedula,nombres:data.nombres||roster?.nombres||'',
+      carrera:enrollment?.nombreCarrera||roster?.carrera||data.nombreCarreraActual||'',
+      periodoId:period.id,sedeOrigen:enrollment?.sede||roster?.sedeOrigen||data.sede||'',activo:true
+    };
     const response=await getDoc(doc(db,responsesCollection,student.id));
     if(!current())return;
     selected=student;
-    $('studentData').innerHTML=`<strong>${esc(selected.nombres)}</strong><span>${esc(selected.carrera)}</span>`;
+    $('studentData').innerHTML=`<strong>${esc(student.nombres)}</strong><span>${esc(student.carrera)}</span>`;
     $('answer').hidden=response.exists();$('receipt').hidden=!response.exists();
     if(response.exists())showReceipt(response.data().sedeElegida);
   }catch(e){if(current()){$('receipt').hidden=true;notice(explain(e),true);}}
@@ -68,14 +79,13 @@ $('answer').addEventListener('submit',e=>{e.preventDefault();busy($('sendButton'
   if(!['Quito','Manta'].includes(city)||!$('consent').checked)throw Error('Selecciona una sede y confirma tu elección.');
   if(!confirm(`¿Confirmas que deseas incorporarte en ${city}?`))return;
   await runTransaction(db,async tx=>{
-    const config=await tx.get(doc(db,configCollection,target.periodoId));
-    const roster=await tx.get(doc(db,rosterCollection,target.id));
-    const ref=doc(db,responsesCollection,target.id),existing=await tx.get(ref);
-    if(!config.exists()||!config.data().abierta)throw Error('La encuesta se ha cerrado.');
-    if(!roster.exists()||!roster.data().activo)throw Error('Tu registro ya no está habilitado.');
+    const institutional=await tx.get(doc(db,'Estudiante',target.cedula));
+    const responseRef=doc(db,responsesCollection,target.id),existing=await tx.get(responseRef);
+    if(!institutional.exists()||institutional.data().eliminado)throw Error('La cédula ya no figura en la base institucional.');
     if(existing.exists())throw Error('Tu respuesta ya está registrada. Consulta nuevamente tu cédula.');
-    const {cedula,nombres,carrera,periodoId,sedeOrigen}=roster.data();
-    tx.set(ref,{cedula,nombres,carrera,periodoId,sedeOrigen,sedeElegida:city,consentimiento:true,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+    const {cedula,nombres,carrera,periodoId,sedeOrigen}=target;
+    tx.set(doc(db,rosterCollection,target.id),{cedula,nombres,carrera,periodoId,sedeOrigen,activo:true},{merge:true});
+    tx.set(responseRef,{cedula,nombres,carrera,periodoId,sedeOrigen,sedeElegida:city,consentimiento:true,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
   });
   if(selected?.id===target.id)showReceipt(city);
   notice('Tu preferencia se guardó correctamente.');
@@ -94,9 +104,12 @@ async function loadAdmin(){
   const contacts=new Map(students.filter(s=>!s.eliminado).map(s=>[String(s.cedula||s.id).trim(),s]));
   currentConfig=config.exists()?config.data():{abierta:false};
   const answers=new Map(responses.docs.map(d=>[d.id,d.data()]));
-  rows=roster.docs.filter(d=>d.data().activo).map(d=>{const a=answers.get(d.id),contact=contacts.get(d.data().cedula)||{};return {...d.data(),celular:contact.celular||'',correoPersonal:contact.correoPersonal||'',correoInstitucional:contact.correoInstitucional||'',id:d.id,sedeElegida:a?.sedeElegida||'',fecha:a?.createdAt?.toDate?.().toLocaleString('es-EC',{timeZone:'America/Guayaquil'})||''};});
+  const joined=new Map(roster.docs.filter(d=>d.data().activo).map(d=>[d.id,d.data()]));
+  // Include respondents who were not synchronized or were later marked inactive.
+  for(const d of responses.docs)if(!joined.has(d.id))joined.set(d.id,{...d.data(),activo:true});
+  rows=[...joined].map(([id,student])=>{const a=answers.get(id),contact=contacts.get(student.cedula)||{};return {...student,celular:contact.celular||'',correoPersonal:contact.correoPersonal||'',correoInstitucional:contact.correoInstitucional||'',id,sedeElegida:a?.sedeElegida||'',fecha:a?.createdAt?.toDate?.().toLocaleString('es-EC',{timeZone:'America/Guayaquil'})||''};});
   $('toggle').textContent=currentConfig.abierta?'Cerrar encuesta':'Abrir encuesta';
-  $('configStatus').textContent=`Estado: ${currentConfig.abierta?'ABIERTA':'CERRADA'} · ${rows.length} estudiantes habilitados. Las respuestas de registros deshabilitados se conservan en Firebase.`;
+  $('configStatus').textContent=`Acceso libre para estudiantes registrados · ${rows.length} estudiantes en el listado de este período. La sincronización es opcional.`;
   renderRows();
 }
 function filtered(){return filterRows(rows,{search:$('search').value,city:$('city').value,career:$('career').value,status:$('status').value});}
@@ -117,8 +130,8 @@ $('sync').addEventListener('click',()=>busy($('sync'),async()=>{
     const writes=[...roster.map(r=>({ref:doc(db,rosterCollection,recordId(period,r.cedula)),data:r})),...old.docs.filter(d=>!ids.has(d.id)).map(d=>({ref:d.ref,data:{...d.data(),activo:false}}))];
     for(let start=0;start<writes.length;start+=400){const batch=writeBatch(db);for(const w of writes.slice(start,start+400))batch.set(w.ref,w.data);await batch.commit();}
     await setDoc(configRef,{abierta:wasOpen&&roster.length>0,sincronizadoEn:serverTimestamp(),updatedAt:serverTimestamp()},{merge:true});
-    await loadAdmin();notice(`Padrón sincronizado: ${roster.length} estudiantes activos. ${wasOpen?'Se restauró la apertura.':'Ahora puedes abrir la encuesta.'}`);
-  }catch(e){await loadAdmin().catch(()=>{});throw Error(`${explain(e)} La encuesta queda cerrada; vuelve a sincronizar antes de abrirla.`);}finally{$('adminPeriod').disabled=false;$('toggle').disabled=false;$('toggle').textContent=currentConfig.abierta?'Cerrar encuesta':'Abrir encuesta';}
+    await loadAdmin();notice(`Padrón sincronizado: ${roster.length} estudiantes activos. Todos los estudiantes registrados pueden elegir sede sin habilitación previa.`);
+  }catch(e){await loadAdmin().catch(()=>{});throw Error(`${explain(e)} La sincronización no se completó, pero los estudiantes registrados pueden seguir eligiendo sede.`);}finally{$('adminPeriod').disabled=false;$('toggle').disabled=false;$('toggle').textContent=currentConfig.abierta?'Cerrar encuesta':'Abrir encuesta';}
 }));
 $('export').addEventListener('click',()=>{if(!authorized)return;const blob=new Blob([csv(filtered())],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`incorporaciones_${adminPeriod}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 $('survey').hidden=adminPage;$('admin').hidden=!adminPage;
