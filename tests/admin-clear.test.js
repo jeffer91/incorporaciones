@@ -53,7 +53,7 @@ function adminHarness({permit=true}={}){
 test('administrador borra solo la elección y mantiene estudiante pendiente',async()=>{
  const h=adminHarness();await h.init();
  await h.remove();
- assert.equal(h.response(),null);
+ assert.equal(h.response(),null, h.element('notice').textContent);
  assert.equal(h.roster().activo,true);
  assert.deepEqual(h.operations.map(o=>o.kind+':'+o.name),[
    'set:incorporaciones_padron','delete:incorporaciones_respuestas'
