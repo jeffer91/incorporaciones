@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {validId,recordId} from '../public/domain.js';
-function setup(getProfile){
+function setup(getProfile,{savedCity=null}={}){
  const elements=new Map(),events=new Map();
  const element=id=>{
    if(!elements.has(id))elements.set(id,{value:id==='cedula'?'0123456789':'',hidden:true,checked:id==='consent',textContent:'',innerHTML:'',addEventListener(event,fn){events.set(id+':'+event,fn);},reset(){}});
@@ -14,7 +14,7 @@ function setup(getProfile){
    document:{getElementById:element},location:{pathname:'/'},initializeApp:()=>({}),getFirestore:()=>({}),validId,recordId,
    console:{error(){}},setTimeout,clearTimeout,
    doc:(_,name,id)=>({name,id}),collection:(_,name)=>name,query:(name)=>({name}),where:()=>({}),
-   getDoc:async ref=>ref.name==='Estudiante'?getProfile():{exists:()=>false},
+   getDoc:async ref=>ref.name==='Estudiante'?getProfile():ref.name==='incorporaciones_respuestas'&&savedCity?{exists:()=>true,data:()=>({sedeElegida:savedCity})}:{exists:()=>false},
    getDocs:async ref=>({docs:ref==='periodos'?[{id:'2026-04',data:()=>({label:'Abril 2026',activo:true})}]:[]}),
    runTransaction:async(_db,fn)=>fn({get:async ref=>ref.name==='Estudiante'?getProfile():{exists:()=>false},set:(ref,data)=>writes.push({ref,data})}),
    confirm:()=>true,serverTimestamp:()=>42,FormData:class{get(){return 'Manta';}}
@@ -42,7 +42,15 @@ test('guarda automáticamente padrón y respuesta sin configuración abierta',as
  assert.equal(writes[0].data.activo,true);
  assert.equal(writes[1].ref.name,'incorporaciones_respuestas');
  assert.equal(writes[1].data.sedeElegida,'Manta');
- assert.match(element('receipt').innerHTML,/Manta/);
+ assert.match(element('receipt').innerHTML,/Elegiste la sede Manta/);
+});
+test('al volver a consultar muestra la sede registrada sin ofrecer otra elección',async()=>{
+ const {context,element}=setup(profile,{savedCity:'Quito'});
+ await vm.runInContext('lookupStudent()',context);
+ assert.equal(element('answer').hidden,true);
+ assert.equal(element('receipt').hidden,false);
+ assert.match(element('receipt').innerHTML,/Tu sede es Quito/);
+ assert.doesNotMatch(element('receipt').innerHTML,/Elegiste la sede/);
 });
 test('no muestra perfiles inexistentes',async()=>{
  const {context,element}=setup(async()=>({exists:()=>false}));
