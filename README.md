@@ -59,3 +59,5 @@ GitHub Pages debe usar Source: GitHub Actions (como en la captura proporcionada)
 - `public/assets/logo-itsqmet.webp`: identidad institucional.
 - `tests/domain.test.js`: pruebas de las reglas de selección y exportación.
 - `.github/workflows/pages.yml`: publicación automática.
+
+La consulta se inicia automáticamente al completar los 10 dígitos (también permite pulsar Consultar). Primero recupera nombre y carrera desde `Estudiante/{cedula}`, incluso sin encuesta abierta o padrón sincronizado. La elección de sede se habilita solo cuando existe un registro activo en una encuesta abierta. Los cambios de cédula invalidan consultas anteriores para no mostrar datos de otra búsqueda.

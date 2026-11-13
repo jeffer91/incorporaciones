@@ -19,29 +19,46 @@ async function loadPeriods(){
   if(adminPeriod&&periods.some(p=>p.id===adminPeriod))$('adminPeriod').value=adminPeriod;
 }
 function resetStudent(){selected=null;$('student').hidden=true;$('answer').reset();}
-$('cedula').addEventListener('input',resetStudent);
-$('lookup').addEventListener('submit',e=>{e.preventDefault();busy($('lookupButton'),async()=>{
-  resetStudent();const cedula=$('cedula').value.trim();
-  if(!validId(cedula))throw Error('Ingresa una cédula de 10 dígitos.');
-  // Refresh opening state on every lookup; no academic period is exposed to students.
-  await loadPeriods();
-  const open=periods.filter(p=>configs.get(p.id)?.abierta);
-  if(!open.length)throw Error('La encuesta aún no está habilitada. Comunícate con Titulación.');
-  const matches=await Promise.all(open.map(async p=>{
-    const id=recordId(p.id,cedula),snapshot=await getDoc(doc(db,rosterCollection,id));
-    return snapshot.exists()?{...snapshot.data(),id}:null;
-  }));
-  const student=chooseEnrollment(matches);
-  if(!student)throw Error('Tu cédula no está habilitada. Comunícate con Titulación.');
-  if($('cedula').value.trim()!==cedula)return;
-  const {id}=student;
-  const response=await getDoc(doc(db,responsesCollection,id));
-  selected=student;
-  if($('cedula').value.trim()!==cedula){resetStudent();return;}
-  $('studentData').innerHTML=`<strong>${esc(selected.nombres)}</strong>${esc(selected.carrera)}`;
-  $('student').hidden=false;$('answer').hidden=response.exists();$('receipt').hidden=!response.exists();
-  if(response.exists())showReceipt(response.data().sedeElegida);
-});});
+let lookupVersion=0, lookupTimer;
+$('cedula').addEventListener('input',()=>{
+  clearTimeout(lookupTimer);lookupVersion++;resetStudent();notice('');
+  $('lookupButton').disabled=false;$('lookupButton').textContent='Consultar';
+  if(validId($('cedula').value.trim()))lookupTimer=setTimeout(lookupStudent,300);
+});
+$('lookup').addEventListener('submit',e=>{e.preventDefault();clearTimeout(lookupTimer);lookupStudent();});
+async function lookupStudent(){
+  const version=++lookupVersion,cedula=$('cedula').value.trim();
+  const current=()=>version===lookupVersion;
+  resetStudent();notice('');
+  if(!validId(cedula)){notice('Ingresa una cédula de 10 dígitos.',true);return;}
+  $('lookupButton').disabled=true;$('lookupButton').textContent='Buscando…';
+  try{
+    // Institutional data is visible independently of survey opening and roster synchronization.
+    const profile=await getDoc(doc(db,'Estudiante',cedula));
+    if(!current())return;
+    if(!profile.exists()||profile.data().eliminado)throw Error('No encontramos tu cédula. Comunícate con Titulación.');
+    const data=profile.data();
+    $('studentData').innerHTML=`<strong>${esc(data.nombres)}</strong><span>${esc(data.nombreCarreraActual||'')}</span>`;
+    $('student').hidden=false;$('answer').hidden=true;$('receipt').hidden=false;
+    $('receipt').textContent='Consultando disponibilidad…';
+    await loadPeriods();if(!current())return;
+    const open=periods.filter(p=>configs.get(p.id)?.abierta);
+    const matches=await Promise.all(open.map(async p=>{
+      const id=recordId(p.id,cedula),snapshot=await getDoc(doc(db,rosterCollection,id));
+      return snapshot.exists()?{...snapshot.data(),id}:null;
+    }));
+    if(!current())return;
+    const student=chooseEnrollment(matches);
+    if(!student){$('receipt').textContent='Tus datos están registrados. La encuesta aún no está habilitada para ti.';return;}
+    const response=await getDoc(doc(db,responsesCollection,student.id));
+    if(!current())return;
+    selected=student;
+    $('studentData').innerHTML=`<strong>${esc(selected.nombres)}</strong><span>${esc(selected.carrera)}</span>`;
+    $('answer').hidden=response.exists();$('receipt').hidden=!response.exists();
+    if(response.exists())showReceipt(response.data().sedeElegida);
+  }catch(e){if(current()){$('receipt').hidden=true;notice(explain(e),true);}}
+  finally{if(current()){$('lookupButton').disabled=false;$('lookupButton').textContent='Consultar';}}
+}
 function showReceipt(city){$('answer').hidden=true;$('receipt').hidden=false;$('receipt').innerHTML=`<strong>Tu preferencia está registrada: ${esc(city)}.</strong><br>Gracias por responder. Para solicitar un cambio, comunícate con Titulación.`;}
 $('answer').addEventListener('submit',e=>{e.preventDefault();busy($('sendButton'),async()=>{
   if(!selected)throw Error('Consulta tus datos nuevamente.');
