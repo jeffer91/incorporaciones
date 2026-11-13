@@ -61,3 +61,18 @@ GitHub Pages debe usar Source: GitHub Actions (como en la captura proporcionada)
 - `.github/workflows/pages.yml`: publicación automática.
 
 La consulta se inicia automáticamente al completar los 10 dígitos (también permite pulsar Consultar). Primero recupera nombre y carrera desde `Estudiante/{cedula}`, incluso sin encuesta abierta o padrón sincronizado. La elección de sede se habilita solo cuando existe un registro activo en una encuesta abierta. Los cambios de cédula invalidan consultas anteriores para no mostrar datos de otra búsqueda.
+
+## Administrador organizado por páginas
+
+- **Estudiantes**: búsqueda y filtros, paginación de 25/50/100, WhatsApp y Outlook individuales. La exportación incluye todas las filas filtradas, no solo la página visible.
+- **Comunicaciones**: mensaje y asunto editables, grupos (todos / pendientes / respondieron / Quito / Manta), filtro por carrera. Botón global para el período seleccionado y grupo completo. Usa ambos correos, deduplica y omite direcciones inválidas; muestra los estudiantes sin correo válido. Permite elegir Outlook institucional (Microsoft 365) o personal (Outlook.com).
+- **Estadísticas**: conteos, porcentaje de respuesta y desglose por carrera de todo el padrón activo del período.
+- **Configuración**: sincronización y apertura/cierre. El selector de período del administrador aplica a todas las páginas.
+
+Los contactos se leen desde `Estudiante` al actualizar el administrador y permanecen en memoria; no se añaden al padrón ni a las respuestas. WhatsApp usa números de Ecuador normalizados y números internacionales explícitos. Los mensajes individuales incluyen nombre, carrera y período; la pantalla del estudiante sigue sin mostrar período.
+
+Los enlaces solo abren el editor de WhatsApp u Outlook. **No envían mensajes automáticamente ni registran como enviado un mensaje por abrir un enlace**. El correo global utiliza CCO. Si el enlace supera 1.800 caracteres, se abre el editor de Outlook con asunto y se ofrecen direcciones y mensaje completos para copiar manualmente. No se truncan ni se omiten destinatarios para acortar el enlace. Outlook puede requerir iniciar sesión o seleccionar la cuenta; revisar siempre el borrador antes de enviar.
+
+La encuesta anuncia **Elección de sede para la incorporación**, del **14 al 16 de diciembre de 2026**, con fecha exacta por comunicar.
+
+Archivos nuevos: `public/admin-ui.js` (navegación, tablas y comunicaciones) y `public/communications.js` (contactos, enlaces, paginación y estadísticas). Las pruebas usan datos ficticios y no envían mensajes ni escriben respuestas reales.
