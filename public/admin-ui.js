@@ -2,7 +2,7 @@ import {filterRows} from './domain.js';
 import {DEFAULT_SUBJECT,DEFAULT_MESSAGE,emailsFor,allEmails,phoneFor,messageFor,whatsappURL,outlookURL,communicationRows,statsFor,pageRows} from './communications.js';
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function setupAdmin({getRows,getPeriodLabel,isAuthorized,notice}){
+export function setupAdmin({getRows,getPeriodLabel,isAuthorized,notice,onClearChoice}){
  let page=1,previousRows=null;
  const tabs=['estudiantes','comunicaciones','estadisticas','configuracion'];
  function navigate(){const target=location.hash.slice(1),active=tabs.includes(target)?target:'estudiantes';for(const t of tabs){$('page-'+t).hidden=t!==active;document.querySelector(`[data-page="${t}"]`).setAttribute('aria-current',t===active?'page':'false');}}
@@ -22,8 +22,8 @@ export function setupAdmin({getRows,getPeriodLabel,isAuthorized,notice}){
    $('pageInfo').textContent=`Página ${p.page} de ${p.pages}`;$('prevPage').disabled=page===1;$('nextPage').disabled=page===p.pages;
    $('rows').innerHTML=p.items.length?p.items.map(r=>{
      const phone=phoneFor(r.celular),emails=emailsFor(r);
-     return `<tr><td><strong>${esc(r.nombres)}</strong><small>${esc(r.cedula)}</small></td><td>${esc(r.carrera)}</td><td><span class="badge ${esc(r.sedeElegida)}">${esc(r.sedeElegida||'Pendiente')}</span></td><td><div class="contact-actions">${phone?`<a class="contact whatsapp" href="${esc(whatsappURL(r,body(r)))}" target="_blank" rel="noopener noreferrer">WhatsApp</a>`:'<span class="contact-missing">Sin teléfono</span>'}${emails.length?`<button class="contact" data-email="${esc(r.id)}" title="${esc(emails.join(' · '))}">Outlook (${emails.length})</button>`:'<span class="contact-missing">Sin correo</span>'}</div></td></tr>`;
-   }).join(''):'<tr><td colspan="4">No hay estudiantes en esta vista.</td></tr>';
+     return `<tr><td><strong>${esc(r.nombres)}</strong><small>${esc(r.cedula)}</small></td><td>${esc(r.carrera)}</td><td><span class="badge ${esc(r.sedeElegida)}">${esc(r.sedeElegida||'Pendiente')}</span></td><td>${r.sedeElegida?`<button type="button" class="contact clear-choice" data-clear-choice="${esc(r.id)}" title="Borrar la elección de sede y permitir otra respuesta">Borrar elección</button>`:'<span class="contact-missing">Sin elección</span>'}</td><td><div class="contact-actions">${phone?`<a class="contact whatsapp" href="${esc(whatsappURL(r,body(r)))}" target="_blank" rel="noopener noreferrer">WhatsApp</a>`:'<span class="contact-missing">Sin teléfono</span>'}${emails.length?`<button class="contact" data-email="${esc(r.id)}" title="${esc(emails.join(' · '))}">Outlook (${emails.length})</button>`:'<span class="contact-missing">Sin correo</span>'}</div></td></tr>`;
+   }).join(''):'<tr><td colspan="5">No hay estudiantes en esta vista.</td></tr>';
  }
  function communications(){
    const group=groupRows(),emails=allEmails(group),without=group.filter(r=>!emailsFor(r).length).length;
@@ -52,7 +52,19 @@ export function setupAdmin({getRows,getPeriodLabel,isAuthorized,notice}){
    }
    window.open(url,'_blank','noopener,noreferrer');
  }
- $('rows').addEventListener('click',event=>{const button=event.target.closest('[data-email]');if(!button)return;const row=getRows().find(r=>r.id===button.dataset.email);if(row)openMail([row],false);});
+ $('rows').addEventListener('click',event=>{
+   const clear=event.target.closest('[data-clear-choice]');
+   if(clear){
+     if(!isAuthorized()||clear.disabled)return;
+     const row=getRows().find(r=>r.id===clear.dataset.clearChoice);
+     if(row?.sedeElegida&&onClearChoice)onClearChoice(row,clear);
+     return;
+   }
+   const button=event.target.closest('[data-email]');
+   if(!button)return;
+   const row=getRows().find(r=>r.id===button.dataset.email);
+   if(row)openMail([row],false);
+ });
  $('globalMail').addEventListener('click',()=>openMail(groupRows(),true));
  async function copy(id){if(!isAuthorized())return;const field=$(id);try{await navigator.clipboard.writeText(field.value);notice('Copiado. Puedes pegarlo en Outlook.');}catch{field.focus();field.select();notice('Texto seleccionado. Pulsa Ctrl+C para copiarlo.');}}
  $('copyEmails').addEventListener('click',()=>copy('emailList'));$('copyMessage').addEventListener('click',()=>copy('messagePreview'));
