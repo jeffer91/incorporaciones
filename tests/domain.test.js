@@ -12,3 +12,9 @@ test('padrón excluye retirados, eliminados y otras cohortes',()=>{
 });
 test('filtros combinados consideran tildes, sede y estado',()=>{const rows=[{cedula:'01',nombres:'José',carrera:'Redes',sedeElegida:'Manta'},{cedula:'02',nombres:'Ana',carrera:'Redes',sedeElegida:''}];assert.equal(filterRows(rows,{search:'jose',city:'Manta'}).length,1);assert.equal(filterRows(rows,{status:'pendiente'})[0].nombres,'Ana');assert.equal(filterRows(rows,{search:'jose',status:'pendiente'}).length,0);});
 test('CSV escapa comillas y neutraliza fórmulas',()=>{const value=csv([{cedula:'0123456789',nombres:'=HYPERLINK("x")'}]);assert.ok(value.includes('"0123456789"'));assert.ok(value.includes("\"'=HYPERLINK"));assert.ok(value.includes('""x""'));});
+
+test('resuelve internamente la matrícula activa más reciente, ignorando ausentes e inactivas',async()=>{
+ const {chooseEnrollment}=await import('../public/domain.js');
+ assert.equal(chooseEnrollment([null,{activo:false,periodoId:'2027-01'},{activo:true,periodoId:'2025-01'},{activo:true,periodoId:'2026-01'}]).periodoId,'2026-01');
+ assert.equal(chooseEnrollment([null,{activo:false,periodoId:'2026-01'}]),null);
+});

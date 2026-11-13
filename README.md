@@ -14,7 +14,7 @@ Encuesta de preferencia de sede (Quito / Manta), conectada al proyecto Firebase 
 2. Seleccionar el período académico.
 3. Pulsar **Sincronizar estudiantes**. Se copian al padrón únicamente los datos mínimos de estudiantes no eliminados con matrícula ACTIVO, no retirada y no eliminada en ese período.
 4. Revisar el número de habilitados y pulsar **Abrir encuesta**.
-5. Compartir el enlace de estudiantes. Seleccionan período, ingresan cédula, revisan sus datos, eligen Quito o Manta y confirman.
+5. Compartir el enlace de estudiantes. Ingresan únicamente su cédula, revisan nombre y carrera, eligen Quito o Manta y confirman. El período no se muestra: se resuelve internamente entre los períodos abiertos con padrón activo. Si hay varias matrículas habilitadas, se utiliza la más reciente por ID de período.
 
 Cada combinación período/cédula admite una respuesta. Una transacción evita sobrescrituras concurrentes desde la aplicación. Al volver a consultar, se muestra la sede ya registrada. Los cambios posteriores se gestionan con Titulación; esta versión no tiene edición de respuestas en el panel.
 

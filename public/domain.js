@@ -22,3 +22,8 @@ export function csv(rows) {
   const keys = ['cedula','nombres','carrera','periodoId','sedeOrigen','sedeElegida','fecha'];
   return '\ufeff'+[keys,...rows.map(r=>keys.map(k=>r[k]||''))].map(row=>row.map(cell).join(';')).join('\r\n');
 }
+
+// Prefer the latest eligible open enrollment when a student belongs to multiple cohorts.
+export function chooseEnrollment(matches) {
+  return matches.filter(r=>r?.activo).sort((a,b)=>b.periodoId.localeCompare(a.periodoId))[0] || null;
+}

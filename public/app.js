@@ -1,6 +1,6 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getFirestore, collection, doc, getDoc, getDocs, setDoc, query, where, writeBatch, serverTimestamp, runTransaction} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
-import {validId, recordId, buildRoster, filterRows, csv} from './domain.js';
+import {validId, recordId, buildRoster, filterRows, csv, chooseEnrollment} from './domain.js';
 const firebaseConfig={apiKey:'AIzaSyCaHf1C0BB0X_H3BDZ1o-UDAsPmLTjsZLA',authDomain:'utet-4387a.firebaseapp.com',projectId:'utet-4387a',storageBucket:'utet-4387a.firebasestorage.app',messagingSenderId:'902848131454',appId:'1:902848131454:web:47f515eb6480834724c32f'};
 const db=getFirestore(initializeApp(firebaseConfig));
 const $=id=>document.getElementById(id);
@@ -15,26 +15,31 @@ async function list(name){return (await getDocs(collection(db,name))).docs.map(d
 async function loadPeriods(){
   periods=(await list('periodos')).filter(p=>!p.eliminado&&p.activo!==false).sort((a,b)=>b.id.localeCompare(a.id));
   configs=new Map((await list(configCollection)).map(c=>[c.id,c]));
-  const open=periods.filter(p=>configs.get(p.id)?.abierta);
-  $('period').innerHTML='<option value="">Selecciona tu período</option>'+open.map(p=>`<option value="${esc(p.id)}">${esc(p.label||p.id)}</option>`).join('');
-  if(!open.length){$('period').innerHTML='<option value="">No hay encuestas abiertas</option>';if(!adminPage)notice('La encuesta aún no está habilitada. Consulta las indicaciones de Titulación.');}
-  $('lookupButton').disabled=!open.length;
   $('adminPeriod').innerHTML=periods.map(p=>`<option value="${esc(p.id)}">${esc(p.label||p.id)}</option>`).join('');
   if(adminPeriod&&periods.some(p=>p.id===adminPeriod))$('adminPeriod').value=adminPeriod;
 }
-function resetStudent(){selected=null;$('student').hidden=true;$('emptyState').hidden=false;$('answer').reset();}
-$('period').addEventListener('change',resetStudent);$('cedula').addEventListener('input',resetStudent);
+function resetStudent(){selected=null;$('student').hidden=true;$('answer').reset();}
+$('cedula').addEventListener('input',resetStudent);
 $('lookup').addEventListener('submit',e=>{e.preventDefault();busy($('lookupButton'),async()=>{
-  resetStudent();const cedula=$('cedula').value.trim(),period=$('period').value;
-  if(!validId(cedula)||!period)throw Error('Selecciona un período e ingresa una cédula de 10 dígitos.');
-  const config=await getDoc(doc(db,configCollection,period));
-  if(!config.exists()||!config.data().abierta)throw Error('La encuesta de este período está cerrada.');
-  const id=recordId(period,cedula), student=await getDoc(doc(db,rosterCollection,id));
-  if(!student.exists()||!student.data().activo)throw Error('Tu cédula no está habilitada en este período. Verifica el período o comunícate con Titulación.');
+  resetStudent();const cedula=$('cedula').value.trim();
+  if(!validId(cedula))throw Error('Ingresa una cédula de 10 dígitos.');
+  // Refresh opening state on every lookup; no academic period is exposed to students.
+  await loadPeriods();
+  const open=periods.filter(p=>configs.get(p.id)?.abierta);
+  if(!open.length)throw Error('La encuesta aún no está habilitada. Comunícate con Titulación.');
+  const matches=await Promise.all(open.map(async p=>{
+    const id=recordId(p.id,cedula),snapshot=await getDoc(doc(db,rosterCollection,id));
+    return snapshot.exists()?{...snapshot.data(),id}:null;
+  }));
+  const student=chooseEnrollment(matches);
+  if(!student)throw Error('Tu cédula no está habilitada. Comunícate con Titulación.');
+  if($('cedula').value.trim()!==cedula)return;
+  const {id}=student;
   const response=await getDoc(doc(db,responsesCollection,id));
-  selected={...student.data(),id};
-  $('studentData').innerHTML=`<strong>${esc(selected.nombres)}</strong>${esc(selected.carrera)}<br>Cédula: ${esc(cedula)}<br>Período: ${esc(periods.find(p=>p.id===period)?.label||period)}`;
-  $('emptyState').hidden=true;$('student').hidden=false;$('answer').hidden=response.exists();$('receipt').hidden=!response.exists();
+  selected=student;
+  if($('cedula').value.trim()!==cedula){resetStudent();return;}
+  $('studentData').innerHTML=`<strong>${esc(selected.nombres)}</strong>${esc(selected.carrera)}`;
+  $('student').hidden=false;$('answer').hidden=response.exists();$('receipt').hidden=!response.exists();
   if(response.exists())showReceipt(response.data().sedeElegida);
 });});
 function showReceipt(city){$('answer').hidden=true;$('receipt').hidden=false;$('receipt').innerHTML=`<strong>Tu preferencia está registrada: ${esc(city)}.</strong><br>Gracias por responder. Para solicitar un cambio, comunícate con Titulación.`;}
@@ -49,7 +54,7 @@ $('answer').addEventListener('submit',e=>{e.preventDefault();busy($('sendButton'
     const ref=doc(db,responsesCollection,target.id),existing=await tx.get(ref);
     if(!config.exists()||!config.data().abierta)throw Error('La encuesta se ha cerrado.');
     if(!roster.exists()||!roster.data().activo)throw Error('Tu registro ya no está habilitado.');
-    if(existing.exists())throw Error('Ya existe una respuesta para esta cédula y período. Consulta nuevamente tus datos.');
+    if(existing.exists())throw Error('Tu respuesta ya está registrada. Consulta nuevamente tu cédula.');
     const {cedula,nombres,carrera,periodoId,sedeOrigen}=roster.data();
     tx.set(ref,{cedula,nombres,carrera,periodoId,sedeOrigen,sedeElegida:city,consentimiento:true,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
   });
@@ -98,4 +103,4 @@ $('sync').addEventListener('click',()=>busy($('sync'),async()=>{
 }));
 $('export').addEventListener('click',()=>{if(!authorized)return;const blob=new Blob([csv(filtered())],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`incorporaciones_${adminPeriod}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 $('survey').hidden=adminPage;$('admin').hidden=!adminPage;
-if(adminPage){authorized=sessionStorage.getItem('inc_admin')==='1';if(authorized)openAdmin();}else{loadPeriods().catch(e=>notice(explain(e),true));}
+if(adminPage){authorized=sessionStorage.getItem('inc_admin')==='1';if(authorized)openAdmin();}
