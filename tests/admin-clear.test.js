@@ -25,7 +25,7 @@ function adminHarness({permit=true}={}){
    sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},
    setupAdmin(args){callbacks=args;return {render(){},clear(){}};},
    initializeApp:()=>({}),getFirestore:()=>({}),console:{error(){}},
-   doc:(_,name,id)=>({name,id}),collection:(_,name)=>name,query:name=>name,where:()=>({}),
+   doc:(_,name,id)=>({name,id}),collection:(_,name)=>name,query:name=>name,where:()=>({}),recordId:(p,c)=>`${p}__${c}`,
    getDoc:async ref=>snap(ref.id,ref.name==='incorporaciones_config'?null:ref.name==='incorporaciones_respuestas'?response:null),
    getDocs:async ref=>{
      if(ref==='periodos')return docs([snap('2026-04',{label:'Abril 2026'})]);
