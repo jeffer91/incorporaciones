@@ -72,7 +72,12 @@ async function lookupStudent(){
   }catch(e){if(current()){$('receipt').hidden=true;notice(explain(e),true);}}
   finally{if(current()){$('lookupButton').disabled=false;$('lookupButton').textContent='Consultar';}}
 }
-function showReceipt(city){$('answer').hidden=true;$('receipt').hidden=false;$('receipt').innerHTML=`<strong>Tu preferencia está registrada: ${esc(city)}.</strong><br>Gracias por responder. Para solicitar un cambio, comunícate con Titulación.`;}
+function showReceipt(city,justSaved=false){
+  $('answer').hidden=true;$('receipt').hidden=false;
+  const heading=justSaved?`Elegiste la sede ${esc(city)}.`:`Tu sede es ${esc(city)}.`;
+  const detail=justSaved?'Tu elección quedó registrada correctamente.':'Tu elección ya está registrada.';
+  $('receipt').innerHTML=`<strong>${heading}</strong><br>${detail} Si necesitas cambiarla, comunícate con Titulación.`;
+}
 $('answer').addEventListener('submit',e=>{e.preventDefault();busy($('sendButton'),async()=>{
   if(!selected)throw Error('Consulta tus datos nuevamente.');
   const target={...selected},city=new FormData($('answer')).get('sede');
@@ -87,8 +92,7 @@ $('answer').addEventListener('submit',e=>{e.preventDefault();busy($('sendButton'
     tx.set(doc(db,rosterCollection,target.id),{cedula,nombres,carrera,periodoId,sedeOrigen,activo:true},{merge:true});
     tx.set(responseRef,{cedula,nombres,carrera,periodoId,sedeOrigen,sedeElegida:city,consentimiento:true,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
   });
-  if(selected?.id===target.id)showReceipt(city);
-  notice('Tu preferencia se guardó correctamente.');
+  if(selected?.id===target.id){showReceipt(city,true);notice('');}
 });});
 $('login').addEventListener('submit',e=>{e.preventDefault();if($('password').value!=='5626'){notice('PIN incorrecto.',true);$('password').value='';return;}authorized=true;sessionStorage.setItem('inc_admin','1');$('password').value='';openAdmin();});
 $('logout').addEventListener('click',()=>{authorized=false;sessionStorage.removeItem('inc_admin');rows=[];adminLoadVersion++;adminUI?.clear();$('rows').replaceChildren();$('dashboard').hidden=true;$('logout').hidden=true;$('login').hidden=false;notice('Sesión cerrada.');});
@@ -111,6 +115,21 @@ async function loadAdmin(){
   $('toggle').textContent=currentConfig.abierta?'Cerrar encuesta':'Abrir encuesta';
   $('configStatus').textContent=`Acceso libre para estudiantes registrados · ${rows.length} estudiantes en el listado de este período. La sincronización es opcional.`;
   renderRows();
+}
+async function clearChoice(row){
+  // Remove only the selected period's answer. Keep the student in the list as pending.
+  if(!authorized||!row||row.periodoId!==adminPeriod||!row.sedeElegida)throw Error('Actualiza el listado antes de borrar esta elección.');
+  if(!confirm(`¿Borrar la sede ${row.sedeElegida} elegida por ${row.nombres} (${row.cedula})? El estudiante podrá volver a elegir.`))return;
+  const id=recordId(row.periodoId,row.cedula),answerRef=doc(db,responsesCollection,id);
+  await runTransaction(db,async tx=>{
+    const existing=await tx.get(answerRef);
+    if(!existing.exists()||existing.data().sedeElegida!==row.sedeElegida)throw Error('La elección cambió o ya fue eliminada. Actualiza el listado.');
+    const {cedula,nombres,carrera,periodoId,sedeOrigen}=existing.data();
+    tx.set(doc(db,rosterCollection,id),{cedula,nombres,carrera,periodoId,sedeOrigen:sedeOrigen||'',activo:true},{merge:true});
+    tx.delete(answerRef);
+  });
+  await loadAdmin();
+  notice(`Se borró la elección de ${row.nombres}. Puede volver a escoger Quito o Manta.`);
 }
 function filtered(){return filterRows(rows,{search:$('search').value,city:$('city').value,career:$('career').value,status:$('status').value});}
 function renderRows(){adminUI?.render();}
@@ -135,4 +154,4 @@ $('sync').addEventListener('click',()=>busy($('sync'),async()=>{
 }));
 $('export').addEventListener('click',()=>{if(!authorized)return;const blob=new Blob([csv(filtered())],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`incorporaciones_${adminPeriod}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 $('survey').hidden=adminPage;$('admin').hidden=!adminPage;
-if(adminPage){adminUI=setupAdmin({getRows:()=>rows,getPeriodLabel:()=>periods.find(p=>p.id===adminPeriod)?.label||adminPeriod,isAuthorized:()=>authorized,notice});authorized=sessionStorage.getItem('inc_admin')==='1';if(authorized)openAdmin();}
+if(adminPage){adminUI=setupAdmin({getRows:()=>rows,getPeriodLabel:()=>periods.find(p=>p.id===adminPeriod)?.label||adminPeriod,isAuthorized:()=>authorized,notice,onClearChoice:(row,button)=>busy(button,()=>clearChoice(row))});authorized=sessionStorage.getItem('inc_admin')==='1';if(authorized)openAdmin();}
