@@ -8,28 +8,28 @@ Encuesta de preferencia de sede (Quito / Manta), conectada al proyecto Firebase 
 - Administrador: https://jeffer91.github.io/incorporaciones/admin.html
 - PIN de administración: **5626**.
 
-## Primera apertura
+## Acceso libre y primera apertura
 
-1. Entrar al enlace de administrador e introducir el PIN.
-2. Seleccionar el período académico.
-3. Pulsar **Sincronizar estudiantes**. Se copian al padrón únicamente los datos mínimos de estudiantes no eliminados con matrícula ACTIVO, no retirada y no eliminada en ese período.
-4. Revisar el número de habilitados y pulsar **Abrir encuesta**.
-5. Compartir el enlace de estudiantes. Ingresan únicamente su cédula, revisan nombre y carrera, eligen Quito o Manta y confirman. El período no se muestra: se resuelve internamente entre los períodos abiertos con padrón activo. Si hay varias matrículas habilitadas, se utiliza la más reciente por ID de período.
+1. Compartir el enlace de estudiantes. No se necesita sincronizar el padrón ni abrir manualmente un período.
+2. Cualquier cédula presente en `Estudiante` y no marcada como eliminada puede consultar sus datos, elegir Quito o Manta y confirmar.
+3. El período se asigna internamente: se prioriza el período más reciente con matrícula o padrón para esa cédula; sin coincidencias, se elige un período abierto como referencia o el período más reciente disponible. El estudiante nunca ve este dato.
+4. Al confirmar se guarda la respuesta y se crea/actualiza el registro correspondiente en el padrón, incluso sin matrícula activa o sincronización previa.
+5. El panel incluye las respuestas de estudiantes que no habían sido sincronizados o cuyo registro quedó inactivo posteriormente.
 
-Cada combinación período/cédula admite una respuesta. Una transacción evita sobrescrituras concurrentes desde la aplicación. Al volver a consultar, se muestra la sede ya registrada. Los cambios posteriores se gestionan con Titulación; esta versión no tiene edición de respuestas en el panel.
+Cada combinación período/cédula admite una sola respuesta. Se utiliza una transacción de Firestore para impedir respuestas duplicadas y conservar la selección. Las modificaciones posteriores deben gestionarse con Titulación; el panel no permite editar directamente la respuesta.
 
-El administrador puede abrir/cerrar por período, actualizar el padrón, ver conteos Quito/Manta/pendientes, buscar, filtrar carrera/sede/estado y exportar los resultados filtrados a CSV compatible con Excel. Al importar CSV en Excel, seleccionar el tipo Texto para cédula, a fin de conservar ceros iniciales.
+Sincronizar el padrón desde administración es **opcional**: sirve para mostrar y contactar estudiantes pendientes, no para habilitar ni bloquear su participación. Las estadísticas muestran tanto el padrón activo como los estudiantes que ya respondieron. El administrador puede buscar, filtrar, exportar resultados a CSV y utilizar comunicaciones por WhatsApp y Outlook.
 
 ## Datos
 
 Lecturas institucionales: `periodos`, `Estudiante`, `matriculas`. Se usa la carrera de la matrícula del período, no necesariamente la carrera actual del estudiante. No se modifica ninguna colección institucional existente.
 
 Colecciones propias:
-- `incorporaciones_config/{periodoId}`: apertura y fecha de sincronización.
+- `incorporaciones_config/{periodoId}`: estado administrativo legado y fecha de sincronización; la apertura no limita las respuestas.
 - `incorporaciones_padron/{periodoId}__{cedula}`: nombre, cédula, carrera, período, sede de origen, activo.
 - `incorporaciones_respuestas/{periodoId}__{cedula}`: datos mínimos del padrón, sede elegida, consentimiento y fechas del servidor.
 
-No se sube el respaldo de estudiantes al repositorio ni se incorporan datos personales en el código. La sincronización se ejecuta desde el navegador del administrador conectado a Firebase. Para evitar respuestas durante una sincronización parcial, se cierra temporalmente la encuesta. Si una sincronización falla, queda cerrada hasta que se complete correctamente. Los registros retirados se deshabilitan y sus respuestas históricas se conservan; las estadísticas muestran solo el padrón activo.
+No se sube el respaldo de estudiantes al repositorio ni se incorporan datos personales en el código. La sincronización se ejecuta desde el navegador del administrador conectado a Firebase. La sincronización del padrón no bloquea nuevas elecciones. Los estudiantes con una cédula institucional vigente pueden responder aunque no estén sincronizados. Se conservan y muestran respuestas incluso cuando un registro de padrón se deshabilita.
 
 ## Modelo de acceso solicitado
 
@@ -60,14 +60,14 @@ GitHub Pages debe usar Source: GitHub Actions (como en la captura proporcionada)
 - `tests/domain.test.js`: pruebas de las reglas de selección y exportación.
 - `.github/workflows/pages.yml`: publicación automática.
 
-La consulta se inicia automáticamente al completar los 10 dígitos (también permite pulsar Consultar). Primero recupera nombre y carrera desde `Estudiante/{cedula}`, incluso sin encuesta abierta o padrón sincronizado. La elección de sede se habilita solo cuando existe un registro activo en una encuesta abierta. Los cambios de cédula invalidan consultas anteriores para no mostrar datos de otra búsqueda.
+La consulta se inicia automáticamente al completar los 10 dígitos (también permite pulsar Consultar). Primero recupera nombre y carrera desde `Estudiante/{cedula}`. La elección se ofrece a todas las cédulas institucionales existentes no eliminadas, independientemente del padrón y de la apertura administrativa. Los cambios de cédula invalidan consultas anteriores para no mostrar datos de otra búsqueda.
 
 ## Administrador organizado por páginas
 
 - **Estudiantes**: búsqueda y filtros, paginación de 25/50/100, WhatsApp y Outlook individuales. La exportación incluye todas las filas filtradas, no solo la página visible.
 - **Comunicaciones**: mensaje y asunto editables, grupos (todos / pendientes / respondieron / Quito / Manta), filtro por carrera. Botón global para el período seleccionado y grupo completo. Usa ambos correos, deduplica y omite direcciones inválidas; muestra los estudiantes sin correo válido. Permite elegir Outlook institucional (Microsoft 365) o personal (Outlook.com).
 - **Estadísticas**: conteos, porcentaje de respuesta y desglose por carrera de todo el padrón activo del período.
-- **Configuración**: sincronización y apertura/cierre. El selector de período del administrador aplica a todas las páginas.
+- **Configuración**: sincronización opcional. El selector de período del administrador aplica a todas las páginas. El botón de apertura/cierre se oculta, ya que el acceso del estudiante es libre.
 
 Los contactos se leen desde `Estudiante` al actualizar el administrador y permanecen en memoria; no se añaden al padrón ni a las respuestas. WhatsApp usa números de Ecuador normalizados y números internacionales explícitos. Los mensajes individuales incluyen nombre, carrera y período; la pantalla del estudiante sigue sin mostrar período.
 
