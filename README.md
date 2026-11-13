@@ -16,7 +16,7 @@ Encuesta de preferencia de sede (Quito / Manta), conectada al proyecto Firebase 
 4. Al confirmar se guarda la respuesta y se crea/actualiza el registro correspondiente en el padrón, incluso sin matrícula activa o sincronización previa.
 5. El panel incluye las respuestas de estudiantes que no habían sido sincronizados o cuyo registro quedó inactivo posteriormente.
 
-Cada combinación período/cédula admite una sola respuesta. Se utiliza una transacción de Firestore para impedir respuestas duplicadas y conservar la selección. Las modificaciones posteriores deben gestionarse con Titulación; el panel no permite editar directamente la respuesta.
+Cada combinación período/cédula admite una sola respuesta. Se utiliza una transacción de Firestore para impedir respuestas duplicadas. Tras confirmar, el estudiante ve «Elegiste la sede Quito/Manta»; si vuelve a consultar su cédula, se muestra «Tu sede es Quito/Manta» sin permitir una segunda elección. El administrador puede usar «Borrar elección» en la fila del estudiante, con confirmación previa, para eliminar exclusivamente esa respuesta. El estudiante permanece en el listado como pendiente y puede volver a elegir. No se modifican las colecciones institucionales.
 
 Sincronizar el padrón desde administración es **opcional**: sirve para mostrar y contactar estudiantes pendientes, no para habilitar ni bloquear su participación. Las estadísticas muestran tanto el padrón activo como los estudiantes que ya respondieron. El administrador puede buscar, filtrar, exportar resultados a CSV y utilizar comunicaciones por WhatsApp y Outlook.
 
@@ -64,7 +64,7 @@ La consulta se inicia automáticamente al completar los 10 dígitos (también pe
 
 ## Administrador organizado por páginas
 
-- **Estudiantes**: búsqueda y filtros, paginación de 25/50/100, WhatsApp y Outlook individuales. La exportación incluye todas las filas filtradas, no solo la página visible.
+- **Estudiantes**: búsqueda y filtros, paginación de 25/50/100, WhatsApp y Outlook individuales, y **Borrar elección** en las filas con sede registrada. El borrado exige confirmación, afecta solo a la respuesta de ese período y permite que el estudiante seleccione de nuevo. La exportación incluye todas las filas filtradas, no solo la página visible.
 - **Comunicaciones**: mensaje y asunto editables, grupos (todos / pendientes / respondieron / Quito / Manta), filtro por carrera. Botón global para el período seleccionado y grupo completo. Usa ambos correos, deduplica y omite direcciones inválidas; muestra los estudiantes sin correo válido. Permite elegir Outlook institucional (Microsoft 365) o personal (Outlook.com).
 - **Estadísticas**: conteos, porcentaje de respuesta y desglose por carrera de todo el padrón activo del período.
 - **Configuración**: sincronización opcional. El selector de período del administrador aplica a todas las páginas. El botón de apertura/cierre se oculta, ya que el acceso del estudiante es libre.
