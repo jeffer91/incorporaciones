@@ -1,6 +1,6 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getFirestore, collection, doc, getDoc, getDocs, setDoc, query, where, writeBatch, serverTimestamp, runTransaction} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
-import {setupAdmin} from './admin-ui.js?v=20261113-4';
+import {setupAdmin} from './admin-ui.js?v=20261113-5';
 import {validId, recordId, buildRoster, filterRows, csv} from './domain.js';
 const firebaseConfig={apiKey:'AIzaSyCaHf1C0BB0X_H3BDZ1o-UDAsPmLTjsZLA',authDomain:'utet-4387a.firebaseapp.com',projectId:'utet-4387a',storageBucket:'utet-4387a.firebasestorage.app',messagingSenderId:'902848131454',appId:'1:902848131454:web:47f515eb6480834724c32f'};
 const db=getFirestore(initializeApp(firebaseConfig));
